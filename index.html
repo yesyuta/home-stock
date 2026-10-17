@@ -421,10 +421,20 @@ function toast(msg,undo){
   clearTimeout(tTimer);tTimer=setTimeout(()=>t.hidden=true,5000);
 }
 function fail(e){
-  if(e&&e.code==="invalid_argument"&&!items.length){}
-  if(e&&(e.code==="invalid_argument"||e.code==="permission-denied")){canWrite=false;$("ro").hidden=false;render();toast(t("errRO"));return;}
-  if(e&&e.code==="quota_exceeded"){toast(t("errFull"));return;}
-  toast(t("errSave"));
+  console.error("[HomeStock] write failed",e);
+  const code=(e&&e.code)||"unknown";
+  if(code==="permission-denied"){canWrite=false;$("ro").hidden=false;render();toast(t("errRO"));return;}
+  if(code==="resource-exhausted"){toast(t("errFull"));return;}
+  toast(t("errSave")+" ("+code+")");
+}
+const TRANSIENT=new Set(["unavailable","deadline-exceeded","aborted","internal","unknown","cancelled"]);
+/* 一時的な通信エラーは少し待って1回だけやり直す */
+async function withRetry(fn){
+  try{return await fn();}
+  catch(e){
+    if(e&&TRANSIENT.has(e.code)){await new Promise(r=>setTimeout(r,1500));return await fn();}
+    throw e;
+  }
 }
 
 /* writes */
@@ -432,10 +442,12 @@ async function buy(itemId,at=Date.now(),qty=1){
   if(!db)return;
   try{
     const ref=db.collection("purchases").doc();
-    await ref.set({itemId,at,qty,by:me||null,byName:meName||""});
     const it=items.find(i=>i.id===itemId);
-    if(it&&it.needed)await db.doc("items/"+itemId).update({needed:false});
+    // 画面にはすぐ反映し、保存はうしろで続ける（通信が切れても端末に残り、つながったら送られる）
+    const saving=withRetry(()=>ref.set({itemId,at,qty,by:me||null,byName:meName||""}));
     toast(t("logged",it?nm(it):""),()=>ref.delete().catch(fail));
+    if(it&&it.needed)withRetry(()=>db.doc("items/"+itemId).update({needed:false})).catch(fail);
+    await saving;
   }catch(e){fail(e)}
 }
 async function addItem(name,cat,guess,nameJa){
