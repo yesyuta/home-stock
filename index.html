@@ -563,7 +563,8 @@ window.addEventListener("offline",()=>toast(t("offline")));
   const app=appM.initializeApp(firebaseConfig);
   auth=aM.getAuth(app);
   await aM.setPersistence(auth,aM.indexedDBLocalPersistence).catch(()=>{});
-  try{fdb=fM.initializeFirestore(app,{localCache:fM.persistentLocalCache({tabManager:fM.persistentMultipleTabManager()})});}
+  // もぐもぐはるきと同じサイト・同じFirebaseなので、端末内の保存領域（IndexedDB）を共有しないようメモリキャッシュにする
+  try{fdb=fM.initializeFirestore(app,{localCache:fM.memoryLocalCache()});}
   catch(_){fdb=fM.getFirestore(app);}
   aM.onAuthStateChanged(auth,u=>{
     stopData();
