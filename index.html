@@ -97,9 +97,27 @@ main{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-lef
 .gauge i.ok{background:var(--ok)} .gauge i.soon{background:var(--soon)} .gauge i.due,.gauge i.need{background:var(--due)}
 .card:focus-visible,.lmain:focus-visible,.check:focus-visible,.chip:focus-visible,.round:focus-visible,.big:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
+/* expiry */
+.erow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--surface);border:2px solid var(--line);border-radius:22px;padding:10px 10px 10px 12px;text-align:left;width:100%}
+.erow .emain{min-width:0;display:flex;flex-direction:column;gap:2px}
+.erow b{font-weight:800;font-size:16.5px;line-height:1.3;overflow-wrap:anywhere}
+.esub{font-size:13px;color:var(--muted);font-weight:600}
+.days{font-family:var(--f-num);min-width:62px;text-align:center;border-radius:16px;padding:6px 8px;line-height:1.1}
+.days b{display:block;font-size:21px;font-weight:600}
+.days span{font-size:11px;font-weight:700;font-family:var(--f-body)}
+.days.expired{background:var(--due);color:#fff}
+.days.today,.days.soon{background:var(--due-soft);color:var(--due)}
+.days.week{background:var(--soon-soft);color:var(--soon)}
+.days.later{background:var(--ok-soft);color:var(--ok)}
+.stepper{display:inline-flex;align-items:center;gap:10px}
+.stepper button{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);background:var(--surface);font-weight:800;font-size:20px}
+.stepper output{font-family:var(--f-num);font-size:20px;min-width:28px;text-align:center}
+.hint2{font-size:12.5px;color:var(--muted);margin:0}
+.erow:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
 /* tab bar */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs-in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+.tabs-in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
 .tab{background:none;border:0;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:800;font-size:12.5px;color:var(--muted);position:relative}
 .tab svg{width:26px;height:26px}
 .tab[aria-selected="true"]{color:var(--accent)}
@@ -197,6 +215,7 @@ input:focus,select:focus{outline:2px solid var(--accent);border-color:transparen
     <div class="ro" id="ro" hidden></div>
     <section id="listView"></section>
     <section id="stockView" hidden></section>
+    <section id="expView" hidden></section>
   </main>
 
   <nav class="tabs"><div class="tabs-in" role="tablist">
@@ -207,6 +226,10 @@ input:focus,select:focus{outline:2px solid var(--accent);border-color:transparen
     <button class="tab" role="tab" id="tabStock" data-tab="stock" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
       <span data-i18n="tabStock"></span>
+    </button>
+    <button class="tab" role="tab" id="tabExp" data-tab="exp" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/><path d="M12 13v3l2 1.2"/></svg>
+      <span data-i18n="tabExp"></span><span class="badge num" id="badge2" hidden></span>
     </button>
   </div></nav>
 </div>
@@ -226,9 +249,17 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 let db=null,me=null,meName="",canWrite=true;
 let items=[],purchases=[],names={},openId=null,confirmDel=false,tab="list",catFilter="all";
 let addCat="Baby",addDays=30;
+let exps=[],placeFilter="all",expDraft=null;
 
 const STR={
-en:{title:"Home Stock",tabList:"To buy",tabStock:"Stock",
+en:{title:"Home Stock",tabList:"To buy",tabStock:"Stock",tabExp:"Expiry",
+ expLead:"Best-before dates are estimated automatically from when you tap Bought. Tap one when it's used up.",autoTag:"est.",autoNote:"Estimated from the purchase date — no need to enter it.",shelfLbl:"Typical shelf life in days (0 = don't track)",expToast:d=>` · best before ~${d}`,itemExpLine:d=>`Best before around ${d} (estimate)`,beforeRunOut:"May expire before you finish it.",manualAdd:"Add something else",expExpired:"Expired",expSoon:"Within 3 days",expWeek:"This week",expLater:"Later",
+ expEmptyT:"No dates tracked yet",expEmptyS:"Tap Bought on a food item and its best-before date will appear here.",expAddT:"Add a best-before date",expWhat:"What is it?",expNamePh:"e.g. Yogurt",
+ expWhen:"Best before",expPlace:"Where is it?",places:{fridge:"Fridge",freezer:"Freezer",pantry:"Pantry",medicine:"Medicine"},
+ rel:{3:"+3 days",7:"+1 week",30:"+1 month",90:"+3 months",365:"+1 year"},openedHint:"Opened something? Use its use-within date (opened formula: about 1 month).",
+ expQty:"Qty",expAdd:"Add",useOne:"Used one",useAll:"Used up / thrown away",cleared:n=>`Cleared ${n}`,expAdded:n=>`Added date for ${n}`,addExpFor:"Add a best-before date",
+ sayExpLeft:(n,d)=>`${n} day${n===1?"":"s"} left (until ${d})`,sayExpToday:"Today is the last day.",sayExpPast:n=>`Expired ${n} day${n===1?"":"s"} ago.`,
+ bigLeft:n=>n===1?"day":"days",bigAgo:n=>n===1?"day ago":"days ago",bigToday:"Today",ideasExp:"Common items",expDate:"Date",addAria:"Add",
  loginLead:"Sign in with the same account you use for Mogu Mogu Haruki.",email:"Email",password:"Password",signIn:"Sign in",
  badLogin:"Email or password is wrong. Please try again.",notVerified:"Please verify your email first (use the link in the verification email), then sign in again.",
  noAccess:"This account can't see the stock list. Ask Yuta to add you.",
@@ -257,7 +288,14 @@ en:{title:"Home Stock",tabList:"To buy",tabStock:"Stock",
  errRO:"Couldn't save — this account can't edit the list",errSave:"Couldn't save. Please try again",syncStop:"Sync stopped. Reopen the app to reconnect",
  today:"today",yesterday:"yesterday",daysAgo:n=>`${n} day${n===1?"":"s"} ago`,
  cats:{"Baby":"Baby","Kitchen":"Kitchen","Bath & Toilet":"Bath & Toilet","Laundry & Cleaning":"Laundry","Food & Drink":"Food","Other":"Other"}},
-ja:{title:"うちのストック帳",tabList:"買うもの",tabStock:"ストック",
+ja:{title:"うちのストック帳",tabList:"買うもの",tabStock:"ストック",tabExp:"期限",
+ expLead:"「買った」を押した日から、賞味期限をおおよそ自動で予想します。使い切ったらタップして片付けてね。",autoTag:"目安",autoNote:"買った日からおおよそ予想した日付です（入力は不要）。",shelfLbl:"賞味期限の目安（日数・0で表示しない）",expToast:d=>`（期限は${d}ごろ）`,itemExpLine:d=>`賞味期限は${d}ごろ（目安）`,beforeRunOut:"使い切る前に期限が来そうです。",manualAdd:"ほかのものを登録",expExpired:"期限切れ",expSoon:"3日以内",expWeek:"1週間以内",expLater:"それ以降",
+ expEmptyT:"まだ登録がありません",expEmptyS:"食品を「買った」にすると、賞味期限を自動で予想してここに出します。",expAddT:"賞味期限を登録",expWhat:"なに？",expNamePh:"例：ヨーグルト",
+ expWhen:"期限",expPlace:"どこにある？",places:{fridge:"冷蔵",freezer:"冷凍",pantry:"常温",medicine:"薬"},
+ rel:{3:"3日後",7:"1週間後",30:"1か月後",90:"3か月後",365:"1年後"},openedHint:"開封したものは「開封後◯日以内」の日付を入れてね（粉ミルクは開封後約1か月）。",
+ expQty:"個数",expAdd:"登録する",useOne:"1つ使った",useAll:"使い切った・捨てた",cleared:n=>`${n}を片付けました`,expAdded:n=>`${n}の期限を登録しました`,addExpFor:"賞味期限も登録する",
+ sayExpLeft:(n,d)=>`あと${n}日（${d}まで）`,sayExpToday:"今日が期限です。",sayExpPast:n=>`${n}日前に期限が切れています。`,
+ bigLeft:n=>"日後",bigAgo:n=>"日前",bigToday:"今日",ideasExp:"よく使うもの",expDate:"日付",addAria:"追加",
  loginLead:"もぐもぐはるきと同じアカウントでログインしてください。",email:"メールアドレス",password:"パスワード",signIn:"ログイン",
  badLogin:"メールアドレスかパスワードが違います。もう一度お試しください。",notVerified:"先に確認メールのリンクを押してから、もう一度ログインしてください。",
  noAccess:"このアカウントではストック帳を見られません。雄太に追加してもらってください。",
@@ -426,14 +464,151 @@ function render(){
   document.documentElement.lang=LANG;
   document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
   document.title=t("title");$("title").textContent=t("title");
-  $("tabList").setAttribute("aria-selected",tab==="list");$("tabStock").setAttribute("aria-selected",tab==="stock");
-  $("listView").hidden=tab!=="list";$("stockView").hidden=tab!=="stock";
+  $("tabList").setAttribute("aria-selected",tab==="list");$("tabStock").setAttribute("aria-selected",tab==="stock");$("tabExp").setAttribute("aria-selected",tab==="exp");
+  $("listView").hidden=tab!=="list";$("stockView").hidden=tab!=="stock";$("expView").hidden=tab!=="exp";
+  $("addBtn").setAttribute("aria-label",tab==="exp"?t("expAddT"):t("addT"));
   $("addBtn").hidden=!canWrite;
   if(!db)return;
   const rs=items.map(it=>[it,predict(it)]);
-  renderList(rs);renderStock(rs);
+  renderList(rs);renderStock(rs);renderExp();
   if(openId)renderSheet();
 }
+
+/* ---- 賞味期限 ---- */
+Object.assign(SH,{
+ carton:(c,d)=>`<rect x="21" y="2" width="6" height="4" rx="1" fill="${d}" ${OL}/><path d="M14 14 L19 5 H29 L34 14 Z" fill="${d}" ${OL}/><rect x="14" y="14" width="20" height="30" rx="3" fill="${c}" ${OL}/>${face(24,29,.85)}`,
+ cube:(c,d)=>`<rect x="7" y="9" width="34" height="32" rx="9" fill="${c}" ${OL}/><path d="M13 16 Q15 13 19 14" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M38 3 V9 M35 6 H41" stroke="${d}" stroke-width="2" stroke-linecap="round"/>${face(24,27)}`,
+ jar:(c,d)=>`<rect x="13" y="6" width="22" height="7" rx="2.5" fill="${d}" ${OL}/><path d="M11 13 H37 Q40 13 40 17 V40 Q40 45 35 45 H13 Q8 45 8 40 V17 Q8 13 11 13 Z" fill="${c}" ${OL}/><rect x="12" y="22" width="24" height="12" rx="3" fill="#fff" opacity=".55"/>${face(24,29)}`,
+ pill:(c,d)=>`<g transform="rotate(-30 24 24)"><rect x="5" y="14" width="38" height="20" rx="10" fill="${c}" ${OL}/><path d="M5 24 A10 10 0 0 1 15 14 H24 V34 H15 A10 10 0 0 1 5 24 Z" fill="${d}" ${OL}/></g>${face(24,25,.8)}`
+});
+const PLACES=["fridge","freezer","pantry","medicine"];
+const PLACE_ICON={fridge:["carton","#fff","#8fc9f2","--c-bath"],freezer:["cube","#e4f6ff","#7fb8ea","--c-laundry"],pantry:["jar","#ffe9c7","#f2c78a","--c-kitchen"],medicine:["pill","#fff","#ff9fb8","--c-baby"]};
+const EXP_IDEAS=[["Milk","牛乳","fridge",7],["Yogurt","ヨーグルト","fridge",10],["Eggs","卵","fridge",21],["Tofu","豆腐","fridge",5],["Cheese","チーズ","fridge",30],["Ham","ハム","fridge",7],["Bread","パン","pantry",4],["Frozen veg","冷凍野菜","freezer",90],["Baby food pouches","離乳食パウチ","pantry",180],["Formula (opened)","粉ミルク（開封後）","pantry",30],["Baby paracetamol","子ども用解熱剤","medicine",365]];
+const SHELF={"formula-milk":[540,"pantry"],"baby-food":[180,"pantry"],"rice":[365,"pantry"],"eggs":[21,"fridge"],"cooking-oil":[365,"pantry"]};
+const ideaFor=name=>EXP_IDEAS.find(x=>x[0]===name||x[1]===name);
+function shelfOf(it){
+  if(it.shelfDays===0)return null;
+  const base=SHELF[it.id]||(()=>{const x=ideaFor(it.name)||ideaFor(it.nameJa);return x?[x[3],x[2]]:null})();
+  if(it.shelfDays>0)return [it.shelfDays,(base&&base[1])||(it.cat==="Food & Drink"?"fridge":"pantry")];
+  return base;
+}
+function autoExps(){
+  const out=[];
+  for(const it of items){
+    const sh=shelfOf(it);if(!sh||it.needed)continue;
+    const ps=purchases.filter(p=>p.itemId===it.id);if(!ps.length)continue;
+    const last=ps.reduce((a,b)=>a.at>b.at?a:b);
+    if(it.expDismissedAt&&it.expDismissedAt>=last.at)continue;
+    out.push({id:"auto-"+it.id,auto:true,itemId:it.id,name:nm(it),place:sh[1],exp:ymd(last.at+sh[0]*DAY),qty:last.qty||1,byName:last.byName||"",lastAt:last.at});
+  }
+  return out;
+}
+const ymd=ms=>{const d=new Date(ms);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+const parseYmd=v=>{const [y,m,d]=String(v).split("-").map(Number);return new Date(y,(m||1)-1,d||1).getTime()};
+const daysTo=e=>Math.round((parseYmd(e.exp)-today0())/DAY);
+function expBand(n){return n<0?"expired":n===0?"today":n<=3?"soon":n<=7?"week":"later";}
+function expIcon(e){
+  const it=e.itemId&&items.find(i=>i.id===e.itemId);
+  if(it)return icon(it);
+  const p=PLACE_ICON[e.place]||PLACE_ICON.pantry;
+  return `<span class="ico" style="--cat:var(${p[3]})"><svg viewBox="0 0 48 48" aria-hidden="true">${SH[p[0]](p[1],p[2])}</svg></span>`;
+}
+function daysBadge(n){
+  const b=expBand(n);
+  if(n===0)return `<span class="days today"><b>${t("bigToday")}</b><span>&nbsp;</span></span>`;
+  if(n<0)return `<span class="days ${b}"><b class="num">${-n}</b><span>${t("bigAgo",-n)}</span></span>`;
+  return `<span class="days ${b}"><b class="num">${n}</b><span>${t("bigLeft",n)}</span></span>`;
+}
+function erow(e){
+  const n=daysTo(e);
+  return `<button class="erow" data-openexp="${e.id}">${expIcon(e)}<span class="emain"><b>${esc(e.name)}</b><span class="esub">${fmtD(parseYmd(e.exp))} · ${STR[LANG].places[e.place]||""}${e.qty>1?` · ×${e.qty}`:""}${e.auto?` · ${t("autoTag")}`:""}</span></span>${daysBadge(n)}</button>`;
+}
+function renderExp(){
+  const allE=[...exps,...autoExps()];
+  const present=PLACES.filter(p=>allE.some(e=>e.place===p));
+  if(placeFilter!=="all"&&!present.includes(placeFilter))placeFilter="all";
+  const list=allE.filter(e=>placeFilter==="all"||e.place===placeFilter).sort((a,b)=>parseYmd(a.exp)-parseYmd(b.exp));
+  const urgent=allE.filter(e=>daysTo(e)<=3).length;
+  $("badge2").textContent=urgent;$("badge2").hidden=!urgent;
+  let h=`<p class="lead">${t("expLead")}</p>`;
+  if(!allE.length){
+    h+=`<div class="emptybox">${expIcon({place:"fridge"})}<b>${t("expEmptyT")}</b><span>${t("expEmptyS")}</span></div>`;
+    if(canWrite)h+=`<div style="display:flex;justify-content:center;margin-top:18px"><button class="pill-btn" data-newexp>＋ ${t("manualAdd")}</button></div>`;
+    $("expView").innerHTML=h;return;
+  }
+  if(present.length>1)h+=`<div class="chips" role="group"><button class="chip" data-pf="all" aria-pressed="${placeFilter==="all"}">${t("all")}</button>${present.map(p=>`<button class="chip" data-pf="${p}" aria-pressed="${placeFilter===p}">${STR[LANG].places[p]}</button>`).join("")}</div>`;
+  const groups=[["expExpired",e=>daysTo(e)<0],["expSoon",e=>{const n=daysTo(e);return n>=0&&n<=3}],["expWeek",e=>{const n=daysTo(e);return n>3&&n<=7}],["expLater",e=>daysTo(e)>7]];
+  for(const [k,f] of groups){const g=list.filter(f);if(g.length)h+=`<div class="sec-h">${t(k)} <span class="num">${g.length}</span></div><div class="list">${g.map(erow).join("")}</div>`;}
+  if(canWrite)h+=`<div style="display:flex;justify-content:center;margin-top:18px"><button class="pill-btn" data-newexp>＋ ${t("manualAdd")}</button></div>`;
+  $("expView").innerHTML=h;
+}
+function newDraft(extra){expDraft=Object.assign({itemId:null,name:"",place:"fridge",date:ymd(today0()+7*DAY),qty:1},extra||{});}
+function renderAddExp(){
+  if(!expDraft)newDraft();
+  const D=expDraft;
+  $("sheetIn").innerHTML=`
+    <div class="sh-head"><h3>${t("expAddT")}</h3>${closeBtn()}</div>
+    <form id="expForm" autocomplete="off" style="display:flex;flex-direction:column;gap:14px">
+      <label>${t("expWhat")}<input id="eName" required maxlength="40" value="${esc(D.name)}" placeholder="${esc(t("expNamePh"))}"></label>
+      <div><label style="margin-bottom:6px">${t("expWhen")}</label>
+        <div class="qchips" style="margin-bottom:8px">${[3,7,30,90,365].map(n=>`<button type="button" class="qchip" data-rel="${n}" aria-pressed="${D.date===ymd(today0()+n*DAY)}">${STR[LANG].rel[n]}</button>`).join("")}</div>
+        <input type="date" id="eDate" value="${D.date}" required>
+        <p class="hint2" style="margin-top:6px">${t("openedHint")}</p></div>
+      <div><label style="margin-bottom:6px">${t("expPlace")}</label><div class="qchips">${PLACES.map(p=>`<button type="button" class="qchip" data-eplace="${p}" aria-pressed="${D.place===p}">${STR[LANG].places[p]}</button>`).join("")}</div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><label>${t("expQty")}</label><span class="stepper"><button type="button" data-dq="-1" aria-label="−">−</button><output id="eQty" class="num">${D.qty}</output><button type="button" data-dq="1" aria-label="+">＋</button></span></div>
+      <button class="big primary" type="submit">${t("expAdd")}</button>
+    </form>
+    ${D.itemId?"":`<div><label style="margin-bottom:6px">${t("ideasExp")}</label><div class="qchips">${EXP_IDEAS.map((x,i)=>`<button class="qchip" data-expidea="${i}">${esc(LANG==="ja"?x[1]:x[0])}</button>`).join("")}</div></div>`}`;
+}
+function renderExpSheet(id){
+  const e=exps.find(x=>x.id===id)||autoExps().find(x=>x.id===id);if(!e){closeSheet();return;}
+  const n=daysTo(e);
+  if(e.auto){
+    const it=items.find(i=>i.id===e.itemId);const r=predict(it);const sh=shelfOf(it);
+    const warn=r.next&&r.next>parseYmd(e.exp)&&n>=0?`<p class="say" style="color:var(--soon);font-size:14px">${t("beforeRunOut")}</p>`:"";
+    const say=n>0?t("sayExpLeft",n,fmtD(parseYmd(e.exp))):n===0?t("sayExpToday"):t("sayExpPast",-n);
+    $("sheetIn").innerHTML=`
+      <div class="sh-head">${expIcon(e)}<h3>${esc(e.name)}</h3>${closeBtn()}</div>
+      <p class="say">${esc(say)}<small>${t("autoNote")}</small></p>${warn}
+      ${canWrite?`<button class="big primary" data-useall="${e.id}">${CHECK}${t("useAll")}</button>
+      <details id="more"><summary>${t("details")}</summary><div class="more">
+        <label>${t("shelfLbl")}<input type="number" id="xShelf" min="0" max="2000" inputmode="numeric" value="${sh?sh[0]:""}"></label>
+      </div></details>`:""}`;
+    return;
+  }
+  const say=n>0?t("sayExpLeft",n,fmtD(parseYmd(e.exp))):n===0?t("sayExpToday"):t("sayExpPast",-n);
+  $("sheetIn").innerHTML=`
+    <div class="sh-head">${expIcon(e)}<h3>${esc(e.name)}</h3>${closeBtn()}</div>
+    <p class="say">${esc(say)}<small>${STR[LANG].places[e.place]||""}${e.qty>1?` · ×${e.qty}`:""}${e.byName?` · ${esc(e.byName)}`:""}</small></p>
+    ${canWrite?`${e.qty>1?`<button class="big primary" data-useone="${e.id}">${CHECK}${t("useOne")}</button>`:""}
+      <button class="big ${e.qty>1?"second":"primary"}" data-useall="${e.id}">${e.qty>1?"":CHECK}${t("useAll")}</button>
+      <details id="more"><summary>${t("details")}</summary><div class="more">
+        <label>${t("expDate")}<input type="date" id="xDate" value="${e.exp}"></label>
+        <div><label style="margin-bottom:6px">${t("expPlace")}</label><div class="qchips">${PLACES.map(p=>`<button type="button" class="qchip" data-xplace="${p}" aria-pressed="${e.place===p}">${STR[LANG].places[p]}</button>`).join("")}</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><label>${t("expQty")}</label><span class="stepper"><button type="button" data-xq="-1" aria-label="−">−</button><output class="num">${e.qty||1}</output><button type="button" data-xq="1" aria-label="+">＋</button></span></div>
+      </div></details>`:""}`;
+}
+async function addExp(){
+  const D=expDraft;const name=(($("eName")||{}).value||"").trim();if(!name||!db)return false;
+  const date=($("eDate")||{}).value||D.date;
+  const match=items.find(i=>i.name===name||i.nameJa===name);
+  const data={kind:"exp",name,itemId:D.itemId||(match?match.id:null),place:D.place,exp:date,qty:D.qty||1,createdAt:Date.now(),by:me||null,byName:meName||""};
+  try{await withRetry(()=>db.collection("items").add(data));toast(t("expAdded",name));return true;}
+  catch(e){fail(e);return false;}
+}
+async function clearExp(id){
+  if(id.startsWith("auto-")){
+    const e=autoExps().find(x=>x.id===id);if(!e)return;const itemId=id.slice(5);
+    try{await withRetry(()=>db.doc("items/"+itemId).update({expDismissedAt:e.lastAt}));toast(t("cleared",e.name),()=>db.doc("items/"+itemId).update({expDismissedAt:0}).catch(fail));}
+    catch(err){fail(err)}
+    return;
+  }
+  const e=exps.find(x=>x.id===id);if(!e)return;
+  const {id:_,...copy}=e;
+  try{await withRetry(()=>db.doc("items/"+id).delete());toast(t("cleared",e.name),()=>db.collection("items").doc(id).set(copy).catch(fail));}
+  catch(err){fail(err)}
+}
+async function updExp(id,patch){try{await withRetry(()=>db.doc("items/"+id).update(patch));}catch(err){fail(err)}}
 
 /* ---- シート ---- */
 function openSheet(id){openId=id;confirmDel=false;$("scrim").hidden=false;$("sheet").hidden=false;renderSheet();$("sheet").scrollTop=0;}
@@ -442,6 +617,8 @@ function closeBtn(){return `<button class="round" data-close aria-label="${t("cl
 function renderSheet(){
   if(openId==="__add")return renderAdd();
   if(openId==="__menu")return renderMenu();
+  if(openId==="__addexp")return renderAddExp();
+  if(openId.startsWith("exp:"))return renderExpSheet(openId.slice(4));
   const it=items.find(i=>i.id===openId); if(!it){closeSheet();return;}
   const r=predict(it);
   let say;
@@ -455,9 +632,11 @@ function renderSheet(){
   const ask=(!r.last&&canWrite)?`<div class="ask"><p>${t("lastQ")}</p><div class="qchips">${[0,3,7,14,30].map(d=>`<button class="qchip" data-past="${d}">${STR[LANG].ago[d]}</button>`).join("")}</div></div>`:"";
   const acts=canWrite?`${r.last?`<button class="big primary" data-buyone="${it.id}">${CHECK}${t("boughtToday")}</button>`:""}
     <button class="big second ${it.needed?"on":""}" data-need="${it.id}">${it.needed?t("onList"):t("ranOut")}</button>`:"";
+  const shI=shelfOf(it);
+  const expFor=(shI&&r.last&&!it.needed)?`<p class="hint2" style="text-align:center;font-size:13.5px;font-weight:700">${t("itemExpLine",fmtD(r.last.at+shI[0]*DAY))}</p>`:"";
   $("sheetIn").innerHTML=`
     <div class="sh-head">${icon(it)}<h3>${esc(nm(it))}</h3>${closeBtn()}</div>
-    ${say}${ask}${acts}
+    ${say}${ask}${acts}${expFor}
     <details id="more"><summary>${t("details")}</summary><div class="more">
       <div class="stats">
         <div class="stat"><b class="num">${r.cycle?Math.round(r.cycle):"—"}</b><span>${t("statCycle")}${r.cycle?`（${r.learned?t("learned"):t("estimate")}）`:""}</span></div>
@@ -475,6 +654,7 @@ function renderSheet(){
         <label>${t("estDays")}<input type="number" id="sGuess" min="1" max="365" value="${it.guessDays||""}" inputmode="numeric"></label>
         <label>${t("cat")}<select id="sCat">${CATS.map(c=>`<option value="${c}" ${c===(it.cat||"Other")?"selected":""}>${catName(c)}</option>`).join("")}</select></label>
       </div>
+      <label>${t("shelfLbl")}<input type="number" id="sShelf" min="0" max="2000" inputmode="numeric" value="${shI?shI[0]:(it.shelfDays===0?0:"")}"></label>
       <button class="danger" id="delBtn">${confirmDel?t("delConfirm"):t("delItem")}</button>`:""}
     </div></details>`;
 }
@@ -526,7 +706,8 @@ async function buy(itemId,at=Date.now(),qty=1){
   try{
     const saving=withRetry(()=>ref.set({itemId,at,qty,by:me||null,byName:meName||""}));
     if(prevNeed)withRetry(()=>db.doc("items/"+itemId).update({needed:false})).catch(fail);
-    toast(t("logged",it?nm(it):""),()=>{ref.delete().catch(fail);if(prevNeed)db.doc("items/"+itemId).update(prevNeed).catch(fail);});
+    const shB=it&&shelfOf(it);
+    toast(t("logged",it?nm(it):"")+(shB?t("expToast",fmtD(at+shB[0]*DAY)):""),()=>{ref.delete().catch(fail);if(prevNeed)db.doc("items/"+itemId).update(prevNeed).catch(fail);});
     await saving;
   }catch(e){fail(e)}
 }
@@ -555,6 +736,18 @@ document.addEventListener("click",async e=>{
   if(d.lang){LANG=d.lang;try{localStorage.setItem("lang",LANG)}catch(_){};applyStaticLang();render();return;}
   if(d.close!==undefined){closeSheet();return;}
   if(d.tick){const row=b.closest(".lrow");row&&row.classList.add("done");const id=d.tick;setTimeout(()=>buy(id),320);return;}
+  if(d.openexp){openSheet("exp:"+d.openexp);return;}
+  if(d.pf){placeFilter=d.pf;render();return;}
+  if(d.newexp!==undefined){newDraft();openSheet("__addexp");return;}
+  if(d.addexpfor){const it=items.find(i=>i.id===d.addexpfor);newDraft({itemId:it.id,name:nm(it),place:it.cat==="Food & Drink"?"fridge":"pantry"});openSheet("__addexp");return;}
+  if(d.expidea!==undefined){const x=EXP_IDEAS[+d.expidea];expDraft.name=LANG==="ja"?x[1]:x[0];expDraft.place=x[2];expDraft.date=ymd(today0()+x[3]*DAY);renderAddExp();return;}
+  if(d.rel){expDraft.date=ymd(today0()+(+d.rel)*DAY);$("eDate").value=expDraft.date;document.querySelectorAll("[data-rel]").forEach(x=>x.setAttribute("aria-pressed",x===b));return;}
+  if(d.eplace){expDraft.place=d.eplace;document.querySelectorAll("[data-eplace]").forEach(x=>x.setAttribute("aria-pressed",x===b));return;}
+  if(d.dq){expDraft.qty=Math.max(1,Math.min(99,(expDraft.qty||1)+(+d.dq)));$("eQty").textContent=expDraft.qty;return;}
+  if(d.useone){const e=exps.find(x=>x.id===d.useone);if(e){updExp(e.id,{qty:(e.qty||1)-1});toast(t("cleared",e.name+" ×1"),()=>updExp(e.id,{qty:e.qty}));}return;}
+  if(d.useall){const id=d.useall;closeSheet();clearExp(id);return;}
+  if(d.xplace){updExp(openId.slice(4),{place:d.xplace});return;}
+  if(d.xq){const e=exps.find(x=>x.id===openId.slice(4));if(e)updExp(e.id,{qty:Math.max(1,Math.min(99,(e.qty||1)+(+d.xq)))});return;}
   if(d.open){openSheet(d.open);return;}
   if(d.cat){catFilter=d.cat;render();return;}
   if(d.buyone){const id=d.buyone;closeSheet();buy(id);return;}
@@ -564,7 +757,7 @@ document.addEventListener("click",async e=>{
   if(d.adddays){addDays=+d.adddays;document.querySelectorAll("[data-adddays]").forEach(x=>x.setAttribute("aria-pressed",+x.dataset.adddays===addDays));return;}
   if(d.quick){if(await addItem(d.quick,d.qcat,null,d.ja))renderSheet();return;}
   if(d.delp){try{await db.doc("purchases/"+d.delp).delete();}catch(err){fail(err)}return;}
-  if(b.id==="addBtn"){openSheet("__add");return;}
+  if(b.id==="addBtn"){if(tab==="exp"){newDraft();openSheet("__addexp");}else openSheet("__add");return;}
   if(b.id==="menuBtn"){openSheet("__menu");return;}
   if(b.id==="toStock"){tab="stock";window.scrollTo(0,0);render();return;}
   if(b.id==="logoutBtn"){closeSheet();authM.signOut(auth);return;}
@@ -581,11 +774,25 @@ document.addEventListener("click",async e=>{
   }
 });
 document.addEventListener("submit",async e=>{
+  if(e.target.id==="expForm"){e.preventDefault();if(await addExp()){expDraft=null;closeSheet();}return;}
   if(e.target.id!=="addForm")return;e.preventDefault();
   if(await addItem($("fName").value,addCat,addDays,null))closeSheet();
 });
+document.addEventListener("input",e=>{
+  if(e.target.id!=="eName"||!expDraft)return;
+  expDraft.name=e.target.value;const v=e.target.value.trim();
+  const it=items.find(i=>i.name===v||i.nameJa===v);const sh=it?shelfOf(it):null;const x=ideaFor(v);
+  const g=sh?[sh[0],sh[1]]:x?[x[3],x[2]]:null;
+  if(g){expDraft.date=ymd(today0()+g[0]*DAY);expDraft.place=g[1];$("eDate").value=expDraft.date;
+    document.querySelectorAll("[data-eplace]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.eplace===g[1]));
+    document.querySelectorAll("[data-rel]").forEach(b=>b.setAttribute("aria-pressed",ymd(today0()+(+b.dataset.rel)*DAY)===expDraft.date));}
+});
 document.addEventListener("change",async e=>{
-  if(!openId||!db||openId.startsWith("__"))return;
+  if(e.target.id==="eDate"&&expDraft){expDraft.date=e.target.value;document.querySelectorAll("[data-rel]").forEach(x=>x.setAttribute("aria-pressed",ymd(today0()+(+x.dataset.rel)*DAY)===expDraft.date));return;}
+  if(e.target.id==="xDate"&&openId&&openId.startsWith("exp:")&&e.target.value){updExp(openId.slice(4),{exp:e.target.value});return;}
+  if(e.target.id==="xShelf"&&openId&&openId.startsWith("exp:auto-")){const v=e.target.value===""?null:Math.max(0,parseInt(e.target.value)||0);updExp(openId.slice(9),{shelfDays:v});return;}
+  if(e.target.id==="sShelf"&&openId&&!openId.startsWith("__")){const v=e.target.value===""?null:Math.max(0,parseInt(e.target.value)||0);updExp(openId,{shelfDays:v});return;}
+  if(!openId||!db||openId.startsWith("__")||openId.startsWith("exp:"))return;
   if(e.target.id==="sGuess"){const v=parseInt(e.target.value)||null;try{await db.doc("items/"+openId).update({guessDays:v});}catch(err){fail(err)}}
   if(e.target.id==="sCat"){try{await db.doc("items/"+openId).update({cat:e.target.value});}catch(err){fail(err)}}
 });
@@ -631,13 +838,13 @@ function startData(u){
     toast(t("syncStop"));
   };
   let migrated=false;
-  unsubs.push(db.collection("items").onSnapshot(s=>{items=s.docs.map(d=>({id:d.id,...d.data()}));render();
+  unsubs.push(db.collection("items").onSnapshot(s=>{const all=s.docs.map(d=>({id:d.id,...d.data()}));items=all.filter(d=>d.kind!=="exp");exps=all.filter(d=>d.kind==="exp");render();
     const w=items.find(i=>i.id==="baby-wipes");if(!migrated&&w&&w.name==="Baby wipes"){migrated=true;db.doc("items/baby-wipes").update({name:"Wet wipes"}).catch(()=>{});}
   },err));
   unsubs.push(db.collection("purchases").onSnapshot(s=>{purchases=s.docs.map(d=>({id:d.id,...d.data()}));render();},err));
   seedOnce().catch(()=>{});
 }
-function stopData(){unsubs.forEach(f=>{try{f()}catch(_){}});unsubs=[];items=[];purchases=[];db=null;}
+function stopData(){unsubs.forEach(f=>{try{f()}catch(_){}});unsubs=[];items=[];purchases=[];exps=[];db=null;}
 
 $("loginForm").addEventListener("submit",async e=>{
   e.preventDefault();$("lErr").hidden=true;

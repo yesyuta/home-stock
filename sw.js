@@ -1,5 +1,5 @@
 // Bump VERSION whenever you upload changed files.
-const VERSION = 'stock-v5';
+const VERSION = 'stock-v6';
 const SHELL = ['./', './index.html', './config.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
