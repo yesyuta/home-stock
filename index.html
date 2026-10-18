@@ -242,7 +242,7 @@ input:focus,select:focus{outline:2px solid var(--accent);border-color:transparen
 import { firebaseConfig } from "./config.js";
 const FB="https://www.gstatic.com/firebasejs/10.12.2/";
 const CATS=["Baby","Kitchen","Bath & Toilet","Laundry & Cleaning","Food & Drink","Other"];
-const QUICK=[["Teething gel","Baby","歯固めジェル"],["Baby lotion","Baby","ベビーローション"],["Cotton buds","Bath & Toilet","綿棒"],["Mouthwash","Bath & Toilet","マウスウォッシュ"],["Dishwasher tablets","Kitchen","食洗機用洗剤"],["Bleach","Laundry & Cleaning","漂白剤"],["Coffee","Food & Drink","コーヒー"],["Milk","Food & Drink","牛乳"],["Bread","Food & Drink","パン"]];
+const QUICK=[["Fresh milk","Food & Drink","牛乳"],["Bread","Food & Drink","食パン"],["Yogurt","Food & Drink","ヨーグルト"],["Tofu","Food & Drink","豆腐"],["Milo","Food & Drink","ミロ"],["Instant noodles","Food & Drink","インスタント麺"],["Soy sauce","Food & Drink","醤油"],["Kaya","Food & Drink","カヤジャム"],["Teething gel","Baby","歯固めジェル"],["Baby lotion","Baby","ベビーローション"],["Cotton buds","Bath & Toilet","綿棒"],["Dishwasher tablets","Kitchen","食洗機用洗剤"],["Bleach","Laundry & Cleaning","漂白剤"],["Mosquito repellent","Other","虫よけ"]];
 const DAY=86400000;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -483,8 +483,9 @@ Object.assign(SH,{
 });
 const PLACES=["fridge","freezer","pantry","medicine"];
 const PLACE_ICON={fridge:["carton","#fff","#8fc9f2","--c-bath"],freezer:["cube","#e4f6ff","#7fb8ea","--c-laundry"],pantry:["jar","#ffe9c7","#f2c78a","--c-kitchen"],medicine:["pill","#fff","#ff9fb8","--c-baby"]};
-const EXP_IDEAS=[["Milk","牛乳","fridge",7],["Yogurt","ヨーグルト","fridge",10],["Eggs","卵","fridge",21],["Tofu","豆腐","fridge",5],["Cheese","チーズ","fridge",30],["Ham","ハム","fridge",7],["Bread","パン","pantry",4],["Frozen veg","冷凍野菜","freezer",90],["Baby food pouches","離乳食パウチ","pantry",180],["Formula (opened)","粉ミルク（開封後）","pantry",30],["Baby paracetamol","子ども用解熱剤","medicine",365]];
-const SHELF={"formula-milk":[540,"pantry"],"baby-food":[180,"pantry"],"rice":[365,"pantry"],"eggs":[21,"fridge"],"cooking-oil":[365,"pantry"]};
+const EXP_IDEAS=[["Fresh milk","牛乳","fridge",10],["Yogurt","ヨーグルト","fridge",14],["Eggs","卵","fridge",21],["Tofu","豆腐","fridge",5],["Bread","食パン","pantry",5],["Kaya","カヤジャム","fridge",30],["Cheese slices","スライスチーズ","fridge",30],["Ham","ハム","fridge",7],["Fish balls","フィッシュボール","fridge",5],["Bananas","バナナ","pantry",4],["Frozen dumplings","冷凍餃子","freezer",90],["Frozen veg","冷凍野菜","freezer",90],["Ikan bilis","イカンビリス","fridge",90],["Instant noodles","インスタント麺","pantry",180],["Milo","ミロ","pantry",365],["Soy sauce","醤油","pantry",365],["Baby food pouches","離乳食パウチ","pantry",180],["Formula (opened)","粉ミルク（開封後）","pantry",30],["Baby paracetamol","子ども用解熱剤","medicine",365]];
+// シンガポールのスーパーで買う一般的な商品の目安（高温多湿なので常温品は短め）
+const SHELF={"formula-milk":[365,"pantry"],"baby-food":[180,"pantry"],"rice":[180,"pantry"],"eggs":[21,"fridge"],"cooking-oil":[365,"pantry"]};
 const ideaFor=name=>EXP_IDEAS.find(x=>x[0]===name||x[1]===name);
 function shelfOf(it){
   if(it.shelfDays===0)return null;
